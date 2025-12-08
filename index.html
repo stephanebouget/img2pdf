@@ -356,6 +356,70 @@
       .status-badge.show {
         display: inline-flex;
       }
+
+      .options-section {
+        margin-top: 20px;
+        padding: 16px;
+        background: rgba(0, 0, 0, 0.2);
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+      }
+
+      .option-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        cursor: pointer;
+      }
+
+      .option-item input[type="checkbox"] {
+        display: none;
+      }
+
+      .checkbox-custom {
+        width: 20px;
+        height: 20px;
+        border: 2px solid rgba(99, 102, 241, 0.5);
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s;
+        background: transparent;
+        flex-shrink: 0;
+      }
+
+      .option-item:hover .checkbox-custom {
+        border-color: #6366f1;
+      }
+
+      .option-item input[type="checkbox"]:checked + .checkbox-custom {
+        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+        border-color: #6366f1;
+      }
+
+      .checkbox-custom svg {
+        width: 12px;
+        height: 12px;
+        color: white;
+        opacity: 0;
+        transition: opacity 0.2s;
+      }
+
+      .option-item input[type="checkbox"]:checked + .checkbox-custom svg {
+        opacity: 1;
+      }
+
+      .option-label {
+        font-size: 14px;
+        color: #a1a1aa;
+        user-select: none;
+      }
+
+      .option-label strong {
+        color: #e4e4e7;
+        font-weight: 500;
+      }
     </style>
     <script src="https://unpkg.com/jspdf@latest/dist/jspdf.umd.min.js"></script>
   </head>
@@ -435,6 +499,26 @@
           <p class="preview-label">Preview</p>
           <div id="imgs"></div>
         </div>
+
+        <div class="options-section">
+          <label class="option-item">
+            <input type="checkbox" id="keep-ratio" checked />
+            <span class="checkbox-custom">
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="3"
+                  d="M5 13l4 4L19 7"
+                />
+              </svg>
+            </span>
+            <span class="option-label"
+              ><strong>Keep aspect ratio</strong> — Image will be centered on A4
+              page</span
+            >
+          </label>
+        </div>
       </div>
 
       <div class="footer">
@@ -465,6 +549,9 @@
       var doc;
       var generatedFiles;
       var filesToGen;
+      var imageQueue = [];
+      var loadedImages = []; // Store all loaded images for regeneration
+      var processingQueue = false;
       window.jsPDF = window.jspdf.jsPDF;
 
       window.addEventListener("load", function () {
@@ -473,6 +560,7 @@
         const fileSelector = document.getElementById("file-selector");
         const dropZone = document.getElementById("drop-zone");
         const browseLink = document.getElementById("browse-link");
+        const keepRatioCheckbox = document.getElementById("keep-ratio");
 
         // Browse link click
         browseLink.addEventListener("click", (e) => {
@@ -505,6 +593,13 @@
 
         fileSelector.addEventListener("change", (event) => {
           handleFiles(event.target.files);
+        });
+
+        // Regenerate PDF when checkbox changes
+        keepRatioCheckbox.addEventListener("change", () => {
+          if (loadedImages.length > 0) {
+            regeneratePDF();
+          }
         });
       });
 
@@ -550,21 +645,106 @@
         } else {
           const reader = new FileReader();
           reader.onload = (event) => {
-            if (generatedFiles !== 0) {
-              doc.addPage("a4", "portrait");
-            }
-            generatedFiles++;
-            updateProgress();
+            // Load image to get dimensions
+            const img = new Image();
+            img.onload = function () {
+              // Add to queue with all necessary data
+              const imageData = {
+                dataUrl: event.target.result,
+                width: img.width,
+                height: img.height,
+              };
+              imageQueue.push(imageData);
+              loadedImages.push(imageData); // Store for regeneration
 
-            addImg(event.target.result);
-            doc.addImage(event.target.result, "JPEG", 0, 0, 210, 297);
-            if (filesToGen === generatedFiles) {
-              document.getElementById("reset-btn").classList.add("show");
-              document.getElementById("dl-btn").classList.add("show");
-              document.getElementById("status-badge").classList.add("show");
-            }
+              addImg(event.target.result);
+
+              // Process queue if not already processing
+              if (!processingQueue) {
+                processImageQueue();
+              }
+            };
+            img.src = event.target.result;
           };
           reader.readAsDataURL(file);
+        }
+      }
+
+      function processImageQueue() {
+        if (imageQueue.length === 0) {
+          processingQueue = false;
+          return;
+        }
+
+        processingQueue = true;
+        const imageData = imageQueue.shift();
+
+        // Add new page if not the first image
+        if (generatedFiles !== 0) {
+          doc.addPage("a4", "portrait");
+        }
+
+        addImageToDoc(imageData);
+
+        generatedFiles++;
+        updateProgress();
+
+        if (filesToGen === generatedFiles) {
+          document.getElementById("reset-btn").classList.add("show");
+          document.getElementById("dl-btn").classList.add("show");
+          document.getElementById("status-badge").classList.add("show");
+        }
+
+        // Process next image in queue
+        processImageQueue();
+      }
+
+      function addImageToDoc(imageData) {
+        const keepRatio = document.getElementById("keep-ratio").checked;
+        const pageWidth = 210;
+        const pageHeight = 297;
+
+        let imgWidth, imgHeight, x, y;
+
+        if (keepRatio) {
+          // Calculate dimensions keeping aspect ratio
+          const imgRatio = imageData.width / imageData.height;
+          const pageRatio = pageWidth / pageHeight;
+
+          if (imgRatio > pageRatio) {
+            // Image is wider than page ratio - fit to width
+            imgWidth = pageWidth;
+            imgHeight = pageWidth / imgRatio;
+          } else {
+            // Image is taller than page ratio - fit to height
+            imgHeight = pageHeight;
+            imgWidth = pageHeight * imgRatio;
+          }
+
+          // Center the image on the page
+          x = (pageWidth - imgWidth) / 2;
+          y = (pageHeight - imgHeight) / 2;
+        } else {
+          // Stretch to fill entire page
+          imgWidth = pageWidth;
+          imgHeight = pageHeight;
+          x = 0;
+          y = 0;
+        }
+
+        doc.addImage(imageData.dataUrl, "JPEG", x, y, imgWidth, imgHeight);
+      }
+
+      function regeneratePDF() {
+        // Create new PDF document
+        doc = new jsPDF();
+
+        // Re-add all images with current settings
+        for (var i = 0; i < loadedImages.length; i++) {
+          if (i !== 0) {
+            doc.addPage("a4", "portrait");
+          }
+          addImageToDoc(loadedImages[i]);
         }
       }
 
@@ -584,6 +764,9 @@
         doc = new jsPDF();
         generatedFiles = 0;
         filesToGen = 0;
+        imageQueue = [];
+        loadedImages = [];
+        processingQueue = false;
       }
 
       function addImg(src) {
