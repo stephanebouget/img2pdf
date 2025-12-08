@@ -3,7 +3,7 @@
 🖼️ **Images to PDF A4 Portrait Converter - 100% Local & Secure**
 
 <div align="center">
-<img width="400" height="823" alt="preview" src="https://github.com/user-attachments/assets/37359437-921f-4e55-b2aa-a4988c7a904c" />
+<img width="400" alt="preview" src="https://github.com/user-attachments/assets/37359437-921f-4e55-b2aa-a4988c7a904c" />
 </div>
 
 A simple and efficient tool to convert your images into A4 portrait PDF documents, directly in your browser without uploading to any external servers.
