@@ -244,8 +244,18 @@
         object-fit: cover;
         border-radius: 8px;
         box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
-        transition: transform 0.2s;
+        transition: transform 0.2s, object-fit 0.3s, background-color 0.3s;
         pointer-events: none;
+      }
+
+      .img-wrapper.keep-ratio img {
+        object-fit: contain;
+        background-color: white;
+      }
+
+      .img-wrapper.fullscreen img {
+        object-fit: fill;
+        background-color: transparent;
       }
 
       .img-wrapper:hover img {
@@ -661,6 +671,7 @@
 
         // Regenerate PDF when checkbox changes
         keepRatioCheckbox.addEventListener("change", () => {
+          updateImgWrapperClasses();
           if (loadedImages.length > 0) {
             regeneratePDF();
           }
@@ -838,6 +849,10 @@
         wrapper.className = "img-wrapper";
         wrapper.draggable = true;
         wrapper.dataset.index = index;
+        
+        // Set initial class based on checkbox state
+        const keepRatio = document.getElementById("keep-ratio").checked;
+        wrapper.classList.add(keepRatio ? "keep-ratio" : "fullscreen");
 
         var indexBadge = document.createElement("span");
         indexBadge.className = "img-index";
@@ -924,6 +939,15 @@
         wrappers.forEach((wrapper, index) => {
           wrapper.dataset.index = index;
           wrapper.querySelector(".img-index").textContent = index + 1;
+        });
+      }
+
+      function updateImgWrapperClasses() {
+        const keepRatio = document.getElementById("keep-ratio").checked;
+        var wrappers = document.querySelectorAll(".img-wrapper");
+        wrappers.forEach((wrapper) => {
+          wrapper.classList.remove("keep-ratio", "fullscreen");
+          wrapper.classList.add(keepRatio ? "keep-ratio" : "fullscreen");
         });
       }
     </script>
