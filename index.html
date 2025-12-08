@@ -191,17 +191,81 @@
         font-size: 13px;
       }
 
-      #imgs img {
+      .img-wrapper {
+        position: relative;
+        cursor: grab;
+        transition: transform 0.2s, opacity 0.2s;
+      }
+
+      .img-wrapper:active {
+        cursor: grabbing;
+      }
+
+      .img-wrapper.dragging {
+        opacity: 0.5;
+        transform: scale(0.95);
+      }
+
+      .img-wrapper.drag-over {
+        transform: translateX(10px);
+      }
+
+      .img-wrapper.drag-over::before {
+        content: "";
+        position: absolute;
+        left: -8px;
+        top: 0;
+        bottom: 0;
+        width: 4px;
+        background: linear-gradient(180deg, #6366f1, #8b5cf6);
+        border-radius: 2px;
+        box-shadow: 0 0 8px rgba(99, 102, 241, 0.6);
+      }
+
+      .img-placeholder {
+        height: 100px;
+        width: 70px;
+        border: 2px dashed rgba(99, 102, 241, 0.5);
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(99, 102, 241, 0.1);
+        color: #6366f1;
+        font-size: 12px;
+        text-align: center;
+        padding: 8px;
+        box-sizing: border-box;
+      }
+
+      .img-wrapper img {
         height: 100px;
         width: 70px;
         object-fit: cover;
         border-radius: 8px;
         box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
         transition: transform 0.2s;
+        pointer-events: none;
       }
 
-      #imgs img:hover {
+      .img-wrapper:hover img {
         transform: scale(1.05);
+      }
+
+      .img-wrapper .img-index {
+        position: absolute;
+        top: 4px;
+        left: 4px;
+        background: rgba(99, 102, 241, 0.9);
+        color: white;
+        font-size: 10px;
+        font-weight: 600;
+        width: 18px;
+        height: 18px;
+        border-radius: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
       }
 
       .file-item {
@@ -657,7 +721,7 @@
               imageQueue.push(imageData);
               loadedImages.push(imageData); // Store for regeneration
 
-              addImg(event.target.result);
+              addImg(event.target.result, loadedImages.length - 1);
 
               // Process queue if not already processing
               if (!processingQueue) {
@@ -769,11 +833,98 @@
         processingQueue = false;
       }
 
-      function addImg(src) {
+      function addImg(src, index) {
+        var wrapper = document.createElement("div");
+        wrapper.className = "img-wrapper";
+        wrapper.draggable = true;
+        wrapper.dataset.index = index;
+
+        var indexBadge = document.createElement("span");
+        indexBadge.className = "img-index";
+        indexBadge.textContent = index + 1;
+
         var img = document.createElement("img");
         img.src = src;
+
+        wrapper.appendChild(indexBadge);
+        wrapper.appendChild(img);
+
+        // Drag events for reordering
+        wrapper.addEventListener("dragstart", handleDragStart);
+        wrapper.addEventListener("dragend", handleDragEnd);
+        wrapper.addEventListener("dragover", handleDragOver);
+        wrapper.addEventListener("dragleave", handleDragLeave);
+        wrapper.addEventListener("drop", handleDrop);
+
         var container = document.getElementById("imgs");
-        container.appendChild(img);
+        container.appendChild(wrapper);
+      }
+
+      var draggedItem = null;
+      var draggedIndex = null;
+
+      function handleDragStart(e) {
+        draggedItem = this;
+        draggedIndex = parseInt(this.dataset.index);
+        this.classList.add("dragging");
+        e.dataTransfer.effectAllowed = "move";
+      }
+
+      function handleDragEnd(e) {
+        this.classList.remove("dragging");
+        document.querySelectorAll(".img-wrapper").forEach((item) => {
+          item.classList.remove("drag-over");
+        });
+        draggedItem = null;
+        draggedIndex = null;
+      }
+
+      function handleDragOver(e) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+        if (this !== draggedItem) {
+          this.classList.add("drag-over");
+        }
+      }
+
+      function handleDragLeave(e) {
+        this.classList.remove("drag-over");
+      }
+
+      function handleDrop(e) {
+        e.preventDefault();
+        this.classList.remove("drag-over");
+
+        if (this === draggedItem) return;
+
+        var targetIndex = parseInt(this.dataset.index);
+
+        // Reorder loadedImages array
+        var movedImage = loadedImages.splice(draggedIndex, 1)[0];
+        loadedImages.splice(targetIndex, 0, movedImage);
+
+        // Rebuild the preview
+        rebuildPreview();
+
+        // Regenerate PDF
+        regeneratePDF();
+      }
+
+      function rebuildPreview() {
+        var container = document.getElementById("imgs");
+        container.innerHTML = "";
+
+        for (var i = 0; i < loadedImages.length; i++) {
+          addImg(loadedImages[i].dataUrl, i);
+        }
+      }
+
+      function updateIndexBadges() {
+        var wrappers = document.querySelectorAll(".img-wrapper");
+        wrappers.forEach((wrapper, index) => {
+          wrapper.dataset.index = index;
+          wrapper.querySelector(".img-index").textContent = index + 1;
+        });
       }
     </script>
   </body>
