@@ -13,6 +13,10 @@ window.addEventListener("load", function () {
   const dropZone = document.getElementById("drop-zone");
   const browseLink = document.getElementById("browse-link");
   const keepRatioCheckbox = document.getElementById("keep-ratio");
+  const compressPdfCheckbox = document.getElementById("compress-pdf");
+  const imageQualitySlider = document.getElementById("image-quality");
+  const qualityValue = document.getElementById("quality-value");
+  const qualitySliderContainer = document.getElementById("quality-slider");
 
   // Browse link click
   browseLink.addEventListener("click", (e) => {
@@ -50,6 +54,25 @@ window.addEventListener("load", function () {
   // Regenerate PDF when checkbox changes
   keepRatioCheckbox.addEventListener("change", () => {
     updateImgWrapperClasses();
+    if (loadedImages.length > 0) {
+      regeneratePDF();
+    }
+  });
+  
+  // Toggle quality slider visibility
+  compressPdfCheckbox.addEventListener("change", () => {
+    qualitySliderContainer.style.display = compressPdfCheckbox.checked ? "block" : "none";
+    if (loadedImages.length > 0) {
+      regeneratePDF();
+    }
+  });
+  
+  // Update quality value display and regenerate PDF
+  imageQualitySlider.addEventListener("input", () => {
+    qualityValue.textContent = imageQualitySlider.value;
+  });
+  
+  imageQualitySlider.addEventListener("change", () => {
     if (loadedImages.length > 0) {
       regeneratePDF();
     }
@@ -154,6 +177,7 @@ function processImageQueue() {
 
 function addImageToDoc(imageData) {
   const keepRatio = document.getElementById("keep-ratio").checked;
+  const compressPdf = document.getElementById("compress-pdf").checked;
   const pageWidth = 210;
   const pageHeight = 297;
 
@@ -185,7 +209,31 @@ function addImageToDoc(imageData) {
     y = 0;
   }
 
-  doc.addImage(imageData.dataUrl, "JPEG", x, y, imgWidth, imgHeight);
+  // Add image with compression if enabled
+  let imageToAdd = imageData.dataUrl;
+  if (compressPdf) {
+    const quality = document.getElementById("image-quality").value / 100;
+    imageToAdd = compressImage(imageData.dataUrl, quality);
+  }
+
+  doc.addImage(imageToAdd, "JPEG", x, y, imgWidth, imgHeight);
+}
+
+function compressImage(dataUrl, quality) {
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  const img = new Image();
+  
+  // Set canvas to image size
+  img.src = dataUrl;
+  canvas.width = img.width;
+  canvas.height = img.height;
+  
+  // Draw image on canvas
+  ctx.drawImage(img, 0, 0);
+  
+  // Return compressed image as data URL
+  return canvas.toDataURL('image/jpeg', quality);
 }
 
 function regeneratePDF() {
